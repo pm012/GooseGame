@@ -2,6 +2,7 @@
 import pygame
 import random
 from entities import Player, Enemy, Bonus
+from dialog import DialogBox
 from constants import *
 
 class Game:
@@ -19,6 +20,8 @@ class Game:
         self.bonuses = pygame.sprite.Group()
         self.score = 0
         self.create_entities()
+        self.dialog_box = DialogBox()
+        self.show_dialog = False  # Initialize show_dialog
 
     def create_entities(self):
         pygame.time.set_timer(pygame.USEREVENT + 1, 1500)
@@ -35,9 +38,23 @@ class Game:
                 self.bonuses.add(Bonus(random.randint(0, WIDTH - 90), -230))
             elif event.type == pygame.USEREVENT + 3:
                 self.player.change_image()
+
+             # Handle dialog box input events
+            if self.show_dialog:
+                if event.type == pygame.KEYDOWN:
+                    option = self.dialog_box.handle_input(event)
+                    if option == 'Exit':
+                        return False
+                    elif option == 'Restart':
+                        self.reset_game()
+                        self.show_dialog = False  # Hide dialog after choosing option
         return True
 
     def update_entities(self):
+        if self.show_dialog:
+            return True
+
+
         self.bg_x1 -= self.bg_move
         self.bg_x2 -= self.bg_move
         if self.bg_x1 < -self.bg.get_width():
@@ -60,7 +77,12 @@ class Game:
             if enemy.rect.left < 0:
                 enemy.kill()
             if pygame.sprite.collide_rect(self.player, enemy):
-                return False
+                self.show_dialog = True
+                break
+
+        # Handle dialog box
+        if self.show_dialog:
+            self.show_dialog = self.handle_dialog()
 
         for bonus in self.bonuses:
             bonus.move()
@@ -70,6 +92,23 @@ class Game:
                 self.score += 1
                 bonus.kill()
         return True
+
+    def handle_dialog(self):
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                option = self.dialog_box.handle_input(event)
+                if option == 'Exit':
+                    return False
+                elif option == 'Restart':
+                    self.reset_game()
+                    return True
+        return True
+
+    def reset_game(self):
+        self.score = 0
+        self.player.rect.topleft = (50, HEIGHT // 2)
+        self.enemies.empty()
+        self.bonuses.empty()
 
     def run(self):
         running = True
@@ -89,6 +128,12 @@ class Game:
             self.bonuses.draw(self.screen)
             self.screen.blit(self.font.render(str(self.score), True, COLOR_RED), (WIDTH - 80, 60))
             self.screen.blit(self.player.image, self.player.rect)
+
+            # Display dialog box if show_dialog is True
+            if self.show_dialog:
+                self.dialog_box.draw(self.screen)
+                pygame.display.flip()
+
             pygame.display.flip()
 
         pygame.quit()
